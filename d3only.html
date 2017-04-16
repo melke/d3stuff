@@ -38,7 +38,11 @@
         var width = window.innerWidth,
             height = window.innerHeight;
 
-        var projection = d3.geoMercator();
+     var projection = d3.geoOrthographic()
+         .scale(245)
+         .rotate([0, 0])
+         .translate([width / 2, height / 2])
+         .clipAngle(90);
 
         var path = d3.geoPath()
             .projection(projection)
@@ -64,15 +68,15 @@
 
 
 
-        d3.json("south-america.json", function(error, data) {
+        d3.json("world-110m.json", function(error, data) {
 
             if (error) throw error;
 
-            var boundary = centerZoom(data);
+            /* var boundary = centerZoom(data);*/
             drawSubUnits(data);
             //drawCitiesFromCsv();
             d3.interval(addHitsRandom, 500);
-            drawOuterBoundary(data, boundary);
+            /* drawOuterBoundary(data, boundary);*/
 
         });
 
@@ -177,7 +181,7 @@
 
         function drawSubUnits(data) {
             g.selectAll(".subunit")
-                .data(topojson.feature(data, data.objects.polygons).features)
+                .data(topojson.feature(data, data.objects.land).features)
                 .enter().append("path")
                 .attr("class", "subunit")
                 .attr("d", path);

@@ -1,0 +1,251 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="utf-8">
+    <title>Earth globe</title>
+    <script src="https://d3js.org/d3.v4.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/topojson/1.6.20/topojson.min.js"></script>
+    <script src="http://d3js.org/queue.v1.min.js"></script>
+</head>
+<style type="text/css">
+    .water {
+        fill: #00b5ff;
+    }
+    
+    .land {
+        fill: #00753a;
+        stroke: #FFF;
+        stroke-width: 0.3px;
+    }
+    
+    .land:hover {
+        fill: #009347;
+        stroke-width: 1px;
+    }
+    
+    .focused {
+        fill: #009347;
+    }
+    
+    select {
+        position: absolute;
+        top: 20px;
+        left: 580px;
+        border: solid #ccc 1px;
+        padding: 3px;
+        box-shadow: inset 1px 1px 2px #ddd8dc;
+    }
+    
+    .countryTooltip {
+        position: absolute;
+        display: none;
+        pointer-events: none;
+        background: #fff;
+        padding: 5px;
+        text-align: left;
+        border: solid #ccc 1px;
+        color: #666;
+        font-size: 14px;
+        font-family: sans-serif;
+    }
+</style>
+
+<body>
+    <script>
+        var width = 700,
+            height = 700,
+            sens = 0.25,
+            focused;
+
+        Array.prototype.extendWith = function(other_array) {
+            other_array.forEach(function(v) {
+                this.push(v)
+            }, this);
+        }
+
+        var counter = 0;
+
+        var hits = [{
+            c: counter++,
+            lat: -15.67,
+            lon: -47.43
+        }, {
+            c: counter++,
+            lat: -22.90,
+            lon: -43.24
+        }];
+
+        //Setting projection
+
+        var projection = d3.geoOrthographic()
+            .scale(290)
+            .rotate([48, 10])
+            .translate([width / 2, height / 2])
+            .clipAngle(90);
+
+        var path = d3.geoPath()
+            .projection(projection);
+
+        var zoomFactor = 1.0;
+
+        var svg = d3.select("body").append("svg")
+            .attr("width", width)
+            .attr("height", height)
+            .call(d3.zoom().on("zoom", function() {
+                // empty hits, because they will be misplaced when transforming
+                hits = [];
+                d3.event.transform.x = d3.event.transform.x + 2;
+                d3.event.transform.y = 0;
+                zoomFactor = d3.event.transform.k;
+                svg.attr("transform", d3.event.transform);
+            }));
+        /* .call(d3.zoom().on("zoom", function () {*/
+        /* console.log(d3.event.transform);*/
+        /* svg.attr("transform", d3.event.transform)*/
+        /* }));*/
+
+
+
+        //Adding water
+
+        svg.append("path")
+            .datum({
+                type: "Sphere"
+            })
+            .attr("class", "water")
+            .attr("d", path);
+
+        var countryTooltip = d3.select("body").append("div").attr("class", "countryTooltip");
+
+
+        queue()
+            .defer(d3.json, "world-110m.json")
+            .defer(d3.tsv, "world-110m-country-names.tsv")
+            .await(ready);
+
+        //Main function
+
+        function ready(error, world, countryData) {
+
+            var countryById = {},
+                countries = topojson.feature(world, world.objects.countries).features;
+
+            //Adding countries to select
+
+            countryData.forEach(function(d) {
+                countryById[d.id] = d.name;
+            });
+
+            //Drawing countries on the globe
+
+            var world = svg.selectAll("path.land")
+                .data(countries)
+                .enter().append("path")
+                .attr("class", "land")
+                .attr("d", path)
+
+            //Drag event
+
+            .call(d3.drag()
+                .subject(function() {
+                    var r = projection.rotate();
+                    return {
+                        x: r[0] / sens,
+                        y: -r[1] / sens
+                    };
+                })
+                .on("drag", function() {
+                    // empty hits, because they will be misplaced when transforming
+                    hits = [];
+                    var rotate = projection.rotate();
+                    projection.rotate([d3.event.x * sens, -d3.event.y * sens, rotate[2]]);
+                    svg.selectAll("path.land").attr("d", path);
+                    svg.selectAll(".focused").classed("focused", focused = false);
+                }))
+
+            //Mouse events
+
+            .on("mouseover", function(d) {
+                    countryTooltip.text(countryById[d.id])
+                        .style("left", (d3.event.pageX + 7) + "px")
+                        .style("top", (d3.event.pageY - 15) + "px")
+                        .style("display", "block")
+                        .style("opacity", 1);
+                })
+                .on("mouseout", function(d) {
+                    countryTooltip.style("opacity", 0)
+                        .style("display", "none");
+                })
+                .on("mousemove", function(d) {
+                    countryTooltip.style("left", (d3.event.pageX + 7) + "px")
+                        .style("top", (d3.event.pageY - 15) + "px");
+                });
+
+            function country(cnt, sel) {
+                for (var i = 0, l = cnt.length; i < l; i++) {
+                    if (cnt[i].id == sel.value) {
+                        return cnt[i];
+                    }
+                }
+            };
+
+            function addHitsRandom() {
+                hits.extendWith([{
+                    c: counter++,
+                    d: Date.now(),
+                    lat: -15.67,
+                    lon: -47.43
+                }, {
+                    c: counter++,
+                    d: Date.now(),
+                    lat: -22.90,
+                    lon: -43.24
+                }]);
+                hits = hits.filter(function(h) {
+                    return Date.now() - h.d < 2000
+                })
+                drawImagesFromHits();
+                //console.log(JSON.stringify(hits));
+            }
+
+
+            function drawImagesFromHits() {
+
+                var sel = g.selectAll("image")
+                    .data(hits, function(d) {
+                        return d.c
+                    });
+                sel.exit().remove();
+
+                sel.enter()
+                    .append("image")
+                    .attr("xlink:href", Math.floor(Math.random() * 4) + ".png")
+                    .attr("x", function(d) {
+                        return projection([d.lon, d.lat])[0];
+                    })
+                    .attr("y", function(d) {
+                        return projection([d.lon, d.lat])[1];
+                    })
+                    .attr("width", 3 / zoomFactor)
+                    .attr("height", 3 / zoomFactor)
+                    .transition()
+                    .duration(2000)
+                    .ease(d3.easeCubicOut)
+                    .attr("width", 40 / zoomFactor)
+                    .attr("height", 40 / zoomFactor)
+                    .attr("x", function(d) {
+                        return projection([d.lon + Math.random() * 4 - 2, d.lat])[0] - 20 / zoomFactor;
+                    })
+                    .attr("y", function(d) {
+                        return projection([d.lon, d.lat + Math.random() * 4 - 2])[1] - 20 / zoomFactor;
+                    })
+            }
+            var g = svg.append("g");
+
+            d3.interval(addHitsRandom, 500);
+        };
+    </script>
+</body>
+
+</html>
