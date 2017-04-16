@@ -1,0 +1,189 @@
+<html>
+
+<head>
+    <style>
+        body {
+            margin: 0;
+            font-family: "Helvetica Neue", sans-serif;
+        }
+        .subunit {
+            fill: #ddd;
+            stroke: #fff;
+            stroke-width: 1px;
+        }
+        .subunit-boundary {
+            fill: none;
+            stroke: #3a403d;
+        }
+        .place-label {
+            font-size: .7em;
+            text-shadow: 0px 0px 2px #fff;
+        }
+    </style>
+
+</head>
+
+<body>
+
+    <script src="https://d3js.org/d3.v4.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/topojson/1.6.20/topojson.min.js"></script>
+
+    <script>
+        Array.prototype.extendWith = function(other_array) {
+            other_array.forEach(function(v) {
+                this.push(v)
+            }, this);
+        }
+
+        var width = window.innerWidth,
+            height = window.innerHeight;
+
+        var projection = d3.geoMercator();
+
+        var path = d3.geoPath()
+            .projection(projection)
+            .pointRadius(2);
+
+        var svg = d3.select("body").append("svg")
+            .attr("width", width)
+            .attr("height", height);
+
+        var g = svg.append("g");
+
+        var counter = 0;
+
+        var hits = [{
+            c: counter++,
+            lat: -15.67,
+            lon: -47.43
+        }, {
+            c: counter++,
+            lat: -22.90,
+            lon: -43.24
+        }];
+
+
+
+        d3.json("south-america.json", function(error, data) {
+
+            if (error) throw error;
+
+            var boundary = centerZoom(data);
+            drawSubUnits(data);
+            //drawCitiesFromCsv();
+            d3.interval(addHitsRandom, 500);
+            drawOuterBoundary(data, boundary);
+
+        });
+
+
+        function addHitsRandom() {
+            hits.extendWith([{
+                c: counter++,
+                d: Date.now(),
+                lat: -15.67,
+                lon: -47.43
+            }, {
+                c: counter++,
+                d: Date.now(),
+                lat: -22.90,
+                lon: -43.24
+            }]);
+            hits = hits.filter(function(h) {
+                return Date.now() - h.d < 2000
+            })
+            drawImagesFromHits();
+            console.log(JSON.stringify(hits));
+        }
+
+
+        function drawImagesFromHits() {
+
+            var sel = g.selectAll("image")
+                .data(hits, function(d) {
+                    return d.c
+                });
+            sel.exit().remove();
+
+            sel.enter()
+                .append("image")
+                .attr("xlink:href", Math.floor(Math.random() * 4) + ".png")
+                .attr("x", function(d) {
+                    return projection([d.lon, d.lat])[0];
+                })
+                .attr("y", function(d) {
+                    return projection([d.lon, d.lat])[1];
+                })
+                .attr("width", 3)
+                .attr("height", 3)
+                .transition()
+                .duration(2000)
+                .ease(d3.easeCubicOut)
+                .attr("width", 40)
+                .attr("height", 40)
+                .attr("x", function(d) {
+                    return projection([d.lon + Math.random() * 4 - 2, d.lat])[0] - 20;
+                })
+                .attr("y", function(d) {
+                    return projection([d.lon, d.lat + Math.random() * 4 - 2])[1] - 20;
+                });
+        }
+
+        function drawCitiesFromCsv() {
+            d3.csv("worldcities.csv", function(error, data) {
+                g.selectAll("circle")
+                    .data(data)
+                    .enter()
+                    .append("circle")
+                    .attr("cx", function(d) {
+                        return projection([d.lng, d.lat])[0];
+                    })
+                    .attr("cy", function(d) {
+                        return projection([d.lng, d.lat])[1];
+                    })
+                    .attr("r", 1)
+                    .style("fill", "blue")
+            });
+        }
+
+        // This function "centers" and "zooms" a map by setting its projection's scale and translate according to its outer boundary
+        // It also returns the boundary itself in case you want to draw it to the map
+        function centerZoom(data) {
+            var o = topojson.mesh(data, data.objects.polygons, function(a, b) {
+                return a === b;
+            });
+
+            projection
+                .scale(1)
+                .translate([0, 0]);
+
+            var b = path.bounds(o),
+                s = 1 / Math.max((b[1][0] - b[0][0]) / width, (b[1][1] - b[0][1]) / height),
+                t = [(width - s * (b[1][0] + b[0][0])) / 2, (height - s * (b[1][1] + b[0][1])) / 2];
+
+            projection
+                .scale(s)
+                .translate(t);
+
+            return o;
+        }
+
+        function drawOuterBoundary(data, boundary) {
+            g.append("path")
+                .datum(boundary)
+                .attr("d", path)
+                .attr("class", "subunit-boundary");
+        }
+
+        function drawSubUnits(data) {
+            g.selectAll(".subunit")
+                .data(topojson.feature(data, data.objects.polygons).features)
+                .enter().append("path")
+                .attr("class", "subunit")
+                .attr("d", path);
+        }
+    </script>
+
+</body>
+
+</html>
