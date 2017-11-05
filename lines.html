@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="utf-8">
+    <title>Lines</title>
+    <script src="/d3.v4.min.js"></script>
+</head>
+<style>
+</style>
+
+<body>
+    <script>
+
+     //The data for our line
+     /* var lineData = [ { "x": 20,   "y": 10},  { "x": 190,  "y": 10},
+      *                  { "x": 130,  "y": 150}, { "x": 20,  "y": 160},
+      *                  { "x": 20,  "y": 250},  { "x": 90, "y": 300}];
+      */
+
+     var lineData = generateNiceRoadData();
+
+     //This is the accessor function we talked about above
+     var lineFunction = d3.line()
+                          .x(function(d) { return d.x; })
+                          .y(function(d) { return d.y; })
+                          .curve(d3.curveBasis);
+
+     //The SVG Container
+     var svgContainer = d3.select("body").append("svg")
+                          .attr("width", 1000)
+                          .attr("height", 10000);
+
+     //The line SVG Path we draw
+     var lineGraph = svgContainer.append("path")
+                                 .attr("d", lineFunction(lineData))
+                                 .attr("stroke", "black")
+                                 .attr("stroke-width", 66)
+                                 .attr("fill", "none");
+
+     console.log(samples(lineGraph.node(), 20));
+     console.log(lineData);
+     var innerGraph = svgContainer.append("path")
+                                  .attr("d", lineFunction(samples(lineGraph.node(), 2)))
+                                  .attr("stroke", "white")
+                                  .attr("stroke-width", 4)
+                                  .attr("stroke-dasharray", "16,6")
+                                  .attr("fill", "none");
+
+     // Sample the SVG path uniformly with the specified precision.
+     function samples(path, precision) {
+         var n = path.getTotalLength(), t = [0], i = 0, dt = precision;
+         while ((i += dt) < n) t.push(i);
+         t.push(n);
+         return t.map(function(t) {
+             var p = path.getPointAtLength(t), a = [p.x, p.y];
+             a.t = t / n;
+             /* return a;*/
+             return {"x": p.x, "y": p.y};
+         });
+     }
+
+     function generateNiceRoadData(){
+         return d3.range(0, 50, Math.PI / 2).map(function(i){
+             return { "x": Math.sin(Math.random() * Math.PI) * 300 + 300, "y": Math.random() * 100 + i * 150 };
+         });
+     }
+
+     function generateRoadData(){
+         return d3.range(20).map(function(i){
+             return { "x": Math.sin(0.8*i) * 100 + 150, "y": i * 50 };
+         });
+     }
+
+     // Compute quads of adjacent points [p0, p1, p2, p3].
+     function quads(points) {
+         return d3.range(points.length - 1).map(function(i) {
+             var a = [points[i - 1], points[i], points[i + 1], points[i + 2]];
+             a.t = (points[i].t + points[i + 1].t) / 2;
+             return a;
+         });
+     }
+
+    </script>
+</body>
+
+</html>
